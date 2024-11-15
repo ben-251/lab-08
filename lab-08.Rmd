@@ -45,14 +45,22 @@ weather %>%
 
 1. Are there any missing values in our variable of interest `RainTomorrow`? If so, we filter them out and save the new dataset as `weather_noNA`. 
 
-```{r}
+```{r filter-rain-nas}
+# the average "na-ness" of raintomorrow is almost zero, but not zero, so there are nas.
 
+weather_noNA <- weather %>%
+  filter(!is.na(RainTomorrow))
 ```
 
 2. Which cities are the ones with more rain days? To do this, let's analyze the `RainToday` variable. 
 
-```{r}
-
+```{r compare-raindays}
+weather_noNA %>% 
+  filter(RainToday == "Yes") %>%
+  group_by(Location) %>%
+  count(RainToday) %>%
+  select(Location, n) %>%
+  arrange(desc(n))
 ```
 
 # Exercise 2: Logistic regression
@@ -60,37 +68,72 @@ weather %>%
 We will focus our analysis on the city of `Portland`.
 Remove `eval=FALSE` from below once you have defined the object `weather_noNA`.
 
-```{r eval=FALSE}
-# remove eval=FALSE
+```{r filter-for-portland}
 weather_Portland <- weather_noNA %>%
   filter(Location == "Portland")
+
+weather_Portland_nos <- weather_Portland %>%
+  mutate(
+    RainToday = case_when(
+       RainToday == "Yes" ~ 1,
+       RainToday == "No" ~ 0
+  )) %>%
+  mutate(
+    RainTomorrow = case_when(
+       RainTomorrow == "Yes" ~ 1,
+       RainTomorrow == "No" ~ 0
+  ))
 ```
 
 1. Try to predict `RainTomorrow` by fitting a linear regression using the variable `RainToday` and print the output using `tidy()`.
 
-```{r}
-
+```{r lin-reg}
+rain_fit_1 <- linear_reg() %>%
+  set_engine("lm") %>%
+  fit(RainTomorrow ~ RainToday, data = weather_Portland_nos)
+tidy(rain_fit)
 ```
+let M = probability it rains tomorrow, T = probability it rains today, then:
+M = 0.309T + 0.254 
+meaning if it doesn't rain today, there's a 0.254 chance of rain. 
+if it does, theres a 0.55 chance of rain (such little rain!)
+
 
 2. For each point in our dataset, what are the fitted probabilities that tomorrow it's going to rain? 
 
 - Plot them using an appropriate visualization. What is peculiar about them?
 
-```{r}
+```{r probability-line}
+weather_Portland %>%
+  ggplot(mapping = aes(x=RainTomorrow,y=RainToday)) + 
+  geom_point() +
+  geom_smooth(method = "lm")
 
 ```
 
 > Hint: how many unique values do the predicted probabilities take? What do these value correspond to?
 
-*Add your answer here*
-
 - Are there any missing values? Why?
 
-```{r}
+```{r better-reg}
+rain_fit <- logistic_reg() %>%
+  set_engine("glm") %>%
+  fit(RainTomorrow ~ RainToday, data = weather_Portland, family="binomial")
+tidy(rain_fit)
 
+weather_Portland %>%
+  ggplot(mapping = aes(x=RainTomorrow,y=RainToday)) + 
+  geom_point() +
+  geom_smooth(method = "glm")
 ```
 
-*Add your answer here*
+the 4 combinations of expected vs actual results, based on whether it rained previous day or not:
+raintoday and raintomorrow
+not rain today and not rain tomorrow
+raintoday but not rain tomorrow
+not rain today but rain tomorrow
+
+we filtered to make sure raintomorrow was never na, but didn't do the same for rain today?
 
 # Exercise 3: Split the data and build workflows
 
